@@ -52,6 +52,7 @@ export default function EntryPage() {
 
     const pm = {}
     prices.forEach(p => { if (p.price > 0) pm[p.item_id] = p.price })
+    console.log('[Entry] prices from DB:', prices.length, pm)
 
     // carry من remaining_at_laundry أمس، carry_treatment من for_treatment أمس
     const carry = {}

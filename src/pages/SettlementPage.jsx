@@ -31,7 +31,8 @@ export default function SettlementPage() {
       ])
       setRecords(recs)
       const pm = {}
-      prices.forEach(p => { pm[p.item_id] = p.price })
+      prices.forEach(p => { if (p.price > 0) pm[p.item_id] = p.price })
+      console.log('[Settlement] prices from DB:', prices.length, pm)
       setPriceMap(pm)
     } catch { toast.error('خطأ في التحميل') }
     finally { setLoading(false) }
@@ -112,6 +113,16 @@ export default function SettlementPage() {
           </div>
         </div>
       </div>
+
+      {!loading && Object.keys(priceMap).length === 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-4 flex items-start gap-3">
+          <span className="text-red-500 text-lg mt-0.5">⚠️</span>
+          <div>
+            <div className="text-sm font-semibold text-red-700">الأسعار غير محددة لهذا الفرع</div>
+            <div className="text-xs text-red-600 mt-0.5">اذهب إلى <strong>صفحة الأسعار</strong> وأدخل الأسعار واضغط <strong>حفظ الأسعار</strong>، ثم ارجع هنا.</div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12 text-slate-400">جاري التحميل...</div>
