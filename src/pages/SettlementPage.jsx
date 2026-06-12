@@ -15,31 +15,38 @@ function formatMonth(ym) {
 }
 
 export default function SettlementPage() {
-  const { fetchMonthRecords } = useLaundry()
+  const { fetchMonthRecords, fetchPrices } = useLaundry()
   const [month, setMonth]       = useState(getCurrentYearMonth())
   const [laundryName, setLaundryName] = useState('')
   const [records, setRecords]   = useState([])
+  const [priceMap, setPriceMap] = useState({})
   const [loading, setLoading]   = useState(false)
 
   const load = async (m) => {
     setLoading(true)
     try {
-      setRecords(await fetchMonthRecords(m))
+      const [recs, prices] = await Promise.all([
+        fetchMonthRecords(m),
+        fetchPrices(),
+      ])
+      setRecords(recs)
+      const pm = {}
+      prices.forEach(p => { pm[p.item_id] = p.price })
+      setPriceMap(pm)
     } catch { toast.error('خطأ في التحميل') }
     finally { setLoading(false) }
   }
 
   useEffect(() => { load(month) }, [month])
 
-  // Aggregate washed quantities per item (only washed clean, not for_treatment)
+  // Aggregate washed quantities — prices come from prices table (always current)
   const agg = {}
-  ITEMS.forEach(item => { agg[item.id] = { ...item, totalWashed: 0, totalForTreatment: 0, price: 0 } })
+  ITEMS.forEach(item => { agg[item.id] = { ...item, totalWashed: 0, totalForTreatment: 0, price: priceMap[item.id] || 0 } })
   records.forEach(rec => {
     rec.record_items?.forEach(ri => {
       if (agg[ri.item_id]) {
-        agg[ri.item_id].totalWashed += ri.washed || 0
+        agg[ri.item_id].totalWashed      += ri.washed        || 0
         agg[ri.item_id].totalForTreatment += ri.for_treatment || 0
-        agg[ri.item_id].price = ri.price || 0
       }
     })
   })
