@@ -47,11 +47,11 @@ export default function EntryPage() {
     const [existing, prev, prices] = await Promise.all([
       fetchRecord(d).catch(() => null),
       fetchPrevRecord(d).catch(() => null),
-      fetchPrices().catch(() => []),
+      fetchPrices().catch((err) => { console.error('fetchPrices error:', err); return [] }),
     ])
 
     const pm = {}
-    prices.forEach(p => { pm[p.item_id] = p.price })
+    prices.forEach(p => { if (p.price > 0) pm[p.item_id] = p.price })
 
     // carry من remaining_at_laundry أمس، carry_treatment من for_treatment أمس
     const carry = {}
@@ -82,7 +82,7 @@ export default function EntryPage() {
           new_qty:         ri.new_qty          ?? 0,
           washed:          ri.washed           ?? 0,
           for_treatment:   ri.for_treatment    ?? 0,
-          price:           pm[item.id]          || ri.price            || 0,
+          price:           pm[item.id] > 0 ? pm[item.id] : (ri.price || 0),
         })
       })
       setRows(loadedRows)

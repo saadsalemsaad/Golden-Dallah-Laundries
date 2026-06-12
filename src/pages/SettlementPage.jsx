@@ -39,16 +39,22 @@ export default function SettlementPage() {
 
   useEffect(() => { load(month) }, [month])
 
-  // Aggregate washed quantities — prices come from prices table (always current)
+  // Aggregate washed quantities
+  // Price priority: prices table (current) → last seen ri.price in records (fallback)
   const agg = {}
-  ITEMS.forEach(item => { agg[item.id] = { ...item, totalWashed: 0, totalForTreatment: 0, price: priceMap[item.id] || 0 } })
+  ITEMS.forEach(item => { agg[item.id] = { ...item, totalWashed: 0, totalForTreatment: 0, price: 0 } })
   records.forEach(rec => {
     rec.record_items?.forEach(ri => {
       if (agg[ri.item_id]) {
-        agg[ri.item_id].totalWashed      += ri.washed        || 0
+        agg[ri.item_id].totalWashed       += ri.washed        || 0
         agg[ri.item_id].totalForTreatment += ri.for_treatment || 0
+        if ((ri.price || 0) > 0) agg[ri.item_id].price = ri.price
       }
     })
+  })
+  // Override with current prices table (takes final priority)
+  Object.entries(priceMap).forEach(([item_id, price]) => {
+    if (agg[item_id] && price > 0) agg[item_id].price = price
   })
 
   const grandTotal = Object.values(agg).reduce((a, i) => a + i.totalWashed * i.price, 0)
