@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLaundry } from '../hooks/useLaundry'
 import { ARABIC_MONTHS } from '../lib/constants'
@@ -23,7 +23,7 @@ export default function LogPage() {
   const [priceMap, setPriceMap] = useState({})
   const [loading, setLoading] = useState(false)
 
-  const load = async (m) => {
+  const load = useCallback(async (m) => {
     setLoading(true)
     try {
       const [data, prices] = await Promise.all([
@@ -39,9 +39,9 @@ export default function LogPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [fetchMonthRecords, fetchPrices])
 
-  useEffect(() => { load(month) }, [month])
+  useEffect(() => { load(month) }, [month, load])
 
   const handleDelete = async (id) => {
     if (!confirm('هل تريد حذف هذا السجل؟')) return

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useLaundry } from '../hooks/useLaundry'
 import { ITEMS, SECTIONS, ARABIC_MONTHS } from '../lib/constants'
 import toast from 'react-hot-toast'
@@ -22,7 +22,7 @@ export default function SettlementPage() {
   const [priceMap, setPriceMap] = useState({})
   const [loading, setLoading]   = useState(false)
 
-  const load = async (m) => {
+  const load = useCallback(async (m) => {
     setLoading(true)
     try {
       const recs = await fetchMonthRecords(m)
@@ -36,9 +36,9 @@ export default function SettlementPage() {
       prices.forEach(p => { if (p.price > 0) pm[p.item_id] = p.price })
       setPriceMap(pm)
     } catch (err) { console.error('fetchPrices settlement error:', err) }
-  }
+  }, [fetchMonthRecords, fetchPrices])
 
-  useEffect(() => { load(month) }, [month])
+  useEffect(() => { load(month) }, [month, load])
 
   // Aggregate washed quantities
   // Price priority: prices table (current) → last seen ri.price in records (fallback)
