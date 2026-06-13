@@ -25,17 +25,17 @@ export default function SettlementPage() {
   const load = async (m) => {
     setLoading(true)
     try {
-      const [recs, prices] = await Promise.all([
-        fetchMonthRecords(m),
-        fetchPrices(),
-      ])
+      const recs = await fetchMonthRecords(m)
       setRecords(recs)
+    } catch { toast.error('خطأ في تحميل السجلات') }
+    finally { setLoading(false) }
+
+    try {
+      const prices = await fetchPrices()
       const pm = {}
       prices.forEach(p => { if (p.price > 0) pm[p.item_id] = p.price })
-      console.log('[Settlement] prices from DB:', prices.length, pm)
       setPriceMap(pm)
-    } catch { toast.error('خطأ في التحميل') }
-    finally { setLoading(false) }
+    } catch (err) { console.error('fetchPrices settlement error:', err) }
   }
 
   useEffect(() => { load(month) }, [month])
