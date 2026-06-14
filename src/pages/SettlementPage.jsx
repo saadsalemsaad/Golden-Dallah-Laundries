@@ -17,7 +17,7 @@ function formatMonth(ym) {
 export default function SettlementPage() {
   const { fetchMonthRecords, fetchPrices } = useLaundry()
   const [month, setMonth]       = useState(getCurrentYearMonth())
-  const [laundryName, setLaundryName] = useState('')
+  const [laundryName, setLaundryName] = useState(() => localStorage.getItem('laundryName') || '')
   const [records, setRecords]   = useState([])
   const [priceMap, setPriceMap] = useState({})
   const [loading, setLoading]   = useState(false)
@@ -68,6 +68,11 @@ export default function SettlementPage() {
   const endRemainingAtLaundry = lastRec?.record_items?.reduce((a, ri) => a + (ri.remaining_at_laundry || 0), 0) || 0
   const endForTreatment = lastRec?.record_items?.reduce((a, ri) => a + (ri.for_treatment || 0), 0) || 0
 
+  const handleLaundryNameChange = (e) => {
+    setLaundryName(e.target.value)
+    localStorage.setItem('laundryName', e.target.value)
+  }
+
   const handlePrint = () => {
     const rows = Object.values(agg).filter(i => i.totalWashed > 0)
       .map(i => `<tr><td>${i.ar}</td><td>${i.en}</td><td style="text-align:center">${i.totalWashed}</td><td style="text-align:center">${i.price.toFixed(2)}</td><td style="text-align:center">${(i.totalWashed * i.price).toFixed(2)}</td></tr>`)
@@ -107,7 +112,7 @@ export default function SettlementPage() {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">اسم المغسلة</label>
-            <input type="text" value={laundryName} onChange={e => setLaundryName(e.target.value)}
+            <input type="text" value={laundryName} onChange={handleLaundryNameChange}
               placeholder="اسم المغسلة للطباعة"
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>

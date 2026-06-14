@@ -2,7 +2,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLaundry } from '../hooks/useLaundry'
 import { ARABIC_MONTHS } from '../lib/constants'
+import { exportDayExcel } from '../lib/exportExcel'
 import toast from 'react-hot-toast'
+
+function ExportIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  )
+}
 
 function getCurrentYearMonth() {
   const d = new Date()
@@ -18,10 +27,10 @@ function formatMonth(ym) {
 export default function LogPage() {
   const { fetchMonthRecords, fetchPrices, deleteRecord } = useLaundry()
   const navigate = useNavigate()
-  const [month, setMonth]     = useState(getCurrentYearMonth())
-  const [records, setRecords] = useState([])
+  const [month, setMonth]       = useState(getCurrentYearMonth())
+  const [records, setRecords]   = useState([])
   const [priceMap, setPriceMap] = useState({})
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]   = useState(false)
 
   const load = useCallback(async (m) => {
     setLoading(true)
@@ -34,7 +43,7 @@ export default function LogPage() {
       const pm = {}
       prices.forEach(p => { if (p.price > 0) pm[p.item_id] = p.price })
       setPriceMap(pm)
-    } catch (e) {
+    } catch {
       toast.error('خطأ في التحميل')
     } finally {
       setLoading(false)
@@ -49,11 +58,8 @@ export default function LogPage() {
     load(month)
   }
 
-  const handleEdit = (date) => {
-    navigate(`/entry?date=${date}`)
-  }
+  const handleEdit = (date) => navigate(`/entry?date=${date}`)
 
-  // حساب مبلغ السجل من record_items × السعر الحالي (لا نعتمد على total_amount المحفوظ)
   const calcAmount = (rec) => {
     if (!rec.record_items?.length) return rec.total_amount || 0
     const computed = rec.record_items.reduce((sum, ri) => {
@@ -61,6 +67,10 @@ export default function LogPage() {
       return sum + (ri.washed || 0) * price
     }, 0)
     return computed > 0 ? computed : (rec.total_amount || 0)
+  }
+
+  const handleExportDay = (rec) => {
+    exportDayExcel({ record: rec, priceMap, laundryName: localStorage.getItem('laundryName') || '' })
   }
 
   const totalAmount = records.reduce((a, r) => a + calcAmount(r), 0)
@@ -137,6 +147,10 @@ export default function LogPage() {
                       className="flex-1 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
                       تعديل
                     </button>
+                    <button onClick={() => handleExportDay(rec)}
+                      className="flex-1 rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-xs font-medium text-green-700 flex items-center justify-center gap-1">
+                      <ExportIcon /> Excel
+                    </button>
                     <button onClick={() => handleDelete(rec.id)}
                       className="flex-1 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
                       حذف
@@ -195,9 +209,13 @@ export default function LogPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <div className="flex gap-2 justify-center">
+                        <div className="flex gap-2 justify-center items-center">
                           <button onClick={() => handleEdit(rec.date)}
                             className="text-xs text-blue-600 hover:text-blue-800 font-medium">تعديل</button>
+                          <button onClick={() => handleExportDay(rec)}
+                            className="text-xs text-green-600 hover:text-green-800 font-medium flex items-center gap-0.5">
+                            <ExportIcon /> Excel
+                          </button>
                           <button onClick={() => handleDelete(rec.id)}
                             className="text-xs text-red-500 hover:text-red-700 font-medium">حذف</button>
                         </div>
