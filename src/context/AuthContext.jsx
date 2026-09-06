@@ -101,6 +101,21 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
   }
 
+  const archiveBranch = async (branchId) => {
+    if (!organization?.id) throw new Error('تعذر تحديد الشركة')
+
+    const { error } = await supabase
+      .from('branches')
+      .update({ status: 'archived' })
+      .eq('id', branchId)
+      .eq('organization_id', organization.id)
+
+    if (error) throw error
+
+    setBranches(current => current.filter(item => item.id !== branchId))
+    setActiveBranch(current => current?.id === branchId ? null : current)
+  }
+
   return (
     <AuthContext.Provider 
       value={{ 
@@ -115,6 +130,7 @@ export function AuthProvider({ children }) {
         branches,
         activeBranch,
         setActiveBranch,
+        archiveBranch,
         isLaundryOwner
       }}
     >

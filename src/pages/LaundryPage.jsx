@@ -5,9 +5,10 @@ import toast from 'react-hot-toast'
 import AddBranchForm from '../components/AddBranchForm'
 
 export default function LaundryPage() {
-  const { organization, branches, activeBranch, setActiveBranch, isLaundryOwner } = useAuth()
+  const { organization, branches, activeBranch, setActiveBranch, archiveBranch, isLaundryOwner } = useAuth()
   const navigate = useNavigate()
   const [showAddBranch, setShowAddBranch] = useState(false)
+  const [archivingId, setArchivingId] = useState(null)
 
   const handleSelectBranch = (branch) => {
     setActiveBranch(branch)
@@ -17,6 +18,22 @@ export default function LaundryPage() {
   const handleBranchAdded = (newBranch) => {
     setShowAddBranch(false)
     toast.success('تم إضافة العميل بنجاح')
+  }
+
+  const handleArchive = async (branch) => {
+    const confirmed = window.confirm('هل أنت متأكد من حذف هذا العميل؟ سيتم إخفاؤه من العملاء النشطين مع الاحتفاظ بالسجلات السابقة.')
+    if (!confirmed) return
+
+    setArchivingId(branch.id)
+    try {
+      await archiveBranch(branch.id)
+      if (activeBranch?.id === branch.id) navigate('/laundry')
+      toast.success('تم حذف العميل من العملاء النشطين')
+    } catch (error) {
+      toast.error('فشل حذف العميل: ' + error.message)
+    } finally {
+      setArchivingId(null)
+    }
   }
 
   if (!isLaundryOwner) {
@@ -67,13 +84,26 @@ export default function LaundryPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {branches.map((branch) => (
-              <button
+              <div
                 key={branch.id}
-                onClick={() => handleSelectBranch(branch)}
-                className="text-right p-4 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
+                className="flex items-center justify-between gap-3 text-right p-4 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
               >
-                <div className="font-medium text-slate-800 mb-1">{branch.name}</div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectBranch(branch)}
+                  className="flex-1 text-right font-medium text-slate-800"
+                >
+                  {branch.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleArchive(branch)}
+                  disabled={archivingId === branch.id}
+                  className="shrink-0 rounded-md border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-60"
+                >
+                  {archivingId === branch.id ? 'جاري الحذف...' : 'حذف العميل'}
+                </button>
+              </div>
             ))}
           </div>
         )}
