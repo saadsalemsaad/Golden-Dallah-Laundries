@@ -6,6 +6,7 @@ import EntryPage from './pages/EntryPage'
 import LogPage from './pages/LogPage'
 import SettlementPage from './pages/SettlementPage'
 import PricesPage from './pages/PricesPage'
+import LaundryPage from './pages/LaundryPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -26,7 +27,8 @@ export default function App() {
           <DashboardLayout />
         </PrivateRoute>
       }>
-        <Route index element={<Navigate to="/entry" replace />} />
+        <Route index element={<LaundryPage />} />
+        <Route path="laundry" element={<LaundryPage />} />
         <Route path="entry" element={<EntryPage />} />
         <Route path="log" element={<LogPage />} />
         <Route path="settlement" element={<SettlementPage />} />

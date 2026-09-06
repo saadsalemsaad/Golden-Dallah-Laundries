@@ -1,6 +1,7 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import toast from 'react-hot-toast'
+import { useEffect } from 'react'
 
 const navItems = [
   { to: '/entry',      icon: '📝', label: 'إدخال يومي' },
@@ -9,15 +10,37 @@ const navItems = [
   { to: '/prices',     icon: '🏷️', label: 'الأسعار' },
 ]
 
+const laundryNavItems = [
+  { to: '/laundry',    icon: '🏢', label: 'العملاء' },
+  { to: '/entry',      icon: '📝', label: 'إدخال يومي' },
+  { to: '/log',        icon: '📅', label: 'السجل اليومي' },
+  { to: '/settlement', icon: '🧾', label: 'التسوية' },
+  { to: '/prices',     icon: '🏷️', label: 'الأسعار' },
+]
+
 export default function DashboardLayout() {
-  const { user, branch, signOut } = useAuth()
+  const { user, branch, signOut, isLaundryOwner, activeBranch } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Redirect based on user type
+  useEffect(() => {
+    if (isLaundryOwner && !activeBranch && location.pathname !== '/laundry') {
+      navigate('/laundry')
+    } else if (!isLaundryOwner && location.pathname === '/') {
+      navigate('/entry')
+    }
+  }, [isLaundryOwner, activeBranch, location.pathname, navigate])
 
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
     toast.success('تم تسجيل الخروج')
   }
+
+  const currentNavItems = isLaundryOwner
+    ? (activeBranch ? laundryNavItems : laundryNavItems.slice(0, 1))
+    : navItems
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -27,11 +50,11 @@ export default function DashboardLayout() {
         <div className="p-5 border-b border-slate-100">
           <div className="text-xl font-bold text-slate-800">🧺 المغسلة</div>
           <div className="text-xs text-blue-600 font-medium mt-1 bg-blue-50 px-2 py-0.5 rounded-full inline-block">
-            {branch || 'الفرع الرئيسي'}
+            {isLaundryOwner ? (activeBranch?.name || 'اختر عميل') : (branch || 'الفرع الرئيسي')}
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {navItems.map(item => (
+          {currentNavItems.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -47,6 +70,12 @@ export default function DashboardLayout() {
           ))}
         </nav>
         <div className="p-3 border-t border-slate-100">
+          {isLaundryOwner && (
+            <div className="px-3 pb-3 text-center text-[10px] leading-5 text-slate-400">
+              <div>تم تطوير النظام بواسطة سعد سالم</div>
+              <div>الدعم: 0507911674</div>
+            </div>
+          )}
           <div className="text-xs text-slate-400 px-3 pb-2 truncate">{user?.email}</div>
           <button
             onClick={handleSignOut}
@@ -62,7 +91,7 @@ export default function DashboardLayout() {
       <header className="md:hidden fixed top-0 inset-x-0 z-40 bg-white border-b border-slate-200 flex items-center justify-between px-4 h-14">
         <div className="text-base font-bold text-slate-800">🧺 المغسلة</div>
         <div className="text-xs text-blue-600 font-medium bg-blue-50 px-2.5 py-1 rounded-full">
-          {branch || 'الفرع الرئيسي'}
+          {isLaundryOwner ? (activeBranch?.name || 'اختر عميل') : (branch || 'الفرع الرئيسي')}
         </div>
       </header>
 
@@ -73,7 +102,7 @@ export default function DashboardLayout() {
 
       {/* ── Mobile bottom nav ── */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 flex items-stretch justify-around h-16">
-        {navItems.map(item => (
+        {currentNavItems.map(item => (
           <NavLink
             key={item.to}
             to={item.to}

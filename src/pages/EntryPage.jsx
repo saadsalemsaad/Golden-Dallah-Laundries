@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ITEMS, SECTIONS } from '../lib/constants'
 import { useLaundry } from '../hooks/useLaundry'
+import { useAuth } from '../context/AuthContext'
+import { printDailyInvoice } from '../lib/dailyInvoice'
 import toast from 'react-hot-toast'
 
 const today = () => new Date().toISOString().split('T')[0]
@@ -34,6 +36,7 @@ function calcRow(row) {
 
 export default function EntryPage() {
   const { fetchRecord, fetchPrevRecord, fetchPrices, saveRecord, loading } = useLaundry()
+  const { organization, activeBranch, isLaundryOwner } = useAuth()
   const location = useLocation()
 
   const [date, setDate]       = useState(today())
@@ -42,6 +45,7 @@ export default function EntryPage() {
   const [rows, setRows]       = useState([])
   const [isSaved, setIsSaved] = useState(false)
   const [carryDate, setCarryDate] = useState(null)
+  const [savedRecord, setSavedRecord] = useState(null)
 
   const loadDate = useCallback(async (d) => {
     const [existing, prev, prices] = await Promise.all([
@@ -71,6 +75,7 @@ export default function EntryPage() {
       setDay(existing.day || '')
       setClient(existing.client || '')
       setIsSaved(true)
+      setSavedRecord(existing)
       const loadedRows = ITEMS.map(item => {
         const ri = existing.record_items.find(r => r.item_id === item.id) || {}
         return calcRow({
@@ -83,15 +88,21 @@ export default function EntryPage() {
           new_qty:         ri.new_qty          ?? 0,
           washed:          ri.washed           ?? 0,
           for_treatment:   ri.for_treatment    ?? 0,
-          price:           pm[item.id] > 0 ? pm[item.id] : (ri.price || 0),
+          price:           ri.price ?? 0,
         })
       })
       setRows(loadedRows)
     } else {
       setIsSaved(false)
+      setSavedRecord(null)
       setRows(initRows(pm, carry, carryTreatment).map(calcRow))
     }
   }, [fetchRecord, fetchPrevRecord, fetchPrices])
+
+  useEffect(() => {
+    const queryDate = new URLSearchParams(location.search).get('date')
+    if (queryDate && queryDate !== date) setDate(queryDate)
+  }, [location.search])
 
   useEffect(() => {
     if (date) loadDate(date)
@@ -107,8 +118,27 @@ export default function EntryPage() {
 
   const handleSave = async () => {
     if (!date) { toast.error('اختر التاريخ أولاً'); return }
-    await saveRecord({ date, day, client, items: rows })
+    const record = await saveRecord({ date, day, client, items: rows })
+    setSavedRecord({
+      ...record,
+      date,
+      day,
+      client,
+      record_items: rows.map(row => ({ ...row })),
+    })
     setIsSaved(true)
+  }
+
+  const handleInvoice = () => {
+    try {
+      printDailyInvoice({
+        record: savedRecord,
+        organizationName: organization.name,
+        customerName: activeBranch.name,
+      })
+    } catch (error) {
+      toast.error(error.message)
+    }
   }
 
   const handleNewDay = () => {
@@ -118,6 +148,7 @@ export default function EntryPage() {
     setDay('')
     setClient('')
     setIsSaved(false)
+    setSavedRecord(null)
   }
 
   const totals = rows.reduce(
@@ -239,6 +270,16 @@ export default function EntryPage() {
                     </label>
                   </div>
 
+                  {isLaundryOwner && (
+                    <label className="block">
+                      <span className="block text-xs font-medium text-slate-500 mb-1">سعر الوحدة</span>
+                      <input type="number" min="0" step="0.01" inputMode="decimal" value={row.price || ''}
+                        onChange={e => updateRow(row.idx, 'price', e.target.value)}
+                        placeholder="0.00"
+                        className="w-full text-center border border-slate-200 rounded-lg py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </label>
+                  )}
+
                   {(row.total_received > 0 || row.washed > 0 || row.for_treatment > 0) && (
                     <div className="grid grid-cols-3 gap-2 text-center text-xs">
                       <div className="rounded-lg bg-slate-50 p-2">
@@ -337,7 +378,14 @@ export default function EntryPage() {
                       </td>
                       {/* السعر */}
                       <td className="text-center px-2 py-2 text-xs text-slate-500">
-                        {row.price > 0 ? `${row.price} ر.س` : <span className="text-slate-300">—</span>}
+                        {isLaundryOwner ? (
+                          <input type="number" min="0" step="0.01" inputMode="decimal" value={row.price || ''}
+                            onChange={e => updateRow(row.idx, 'price', e.target.value)}
+                            placeholder="0.00"
+                            className="w-20 text-center border border-slate-200 rounded-md py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        ) : (
+                          row.price > 0 ? `${row.price} ر.س` : <span className="text-slate-300">—</span>
+                        )}
                       </td>
                       {/* المبلغ */}
                       <td className="text-center px-2 py-2 text-xs font-medium text-slate-700">
@@ -371,6 +419,12 @@ export default function EntryPage() {
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+        {isLaundryOwner && activeBranch && isSaved && savedRecord && (
+          <button onClick={handleInvoice}
+            className="w-full sm:w-auto px-4 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors text-center">
+            🧾 إصدار فاتورة اليوم
+          </button>
+        )}
         <button onClick={handleNewDay}
           className="w-full sm:w-auto px-4 py-2.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors text-center">
           ➕ يوم جديد

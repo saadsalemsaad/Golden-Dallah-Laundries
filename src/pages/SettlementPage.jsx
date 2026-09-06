@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useLaundry } from '../hooks/useLaundry'
+import { useAuth } from '../context/AuthContext'
 import { ITEMS, SECTIONS, ARABIC_MONTHS } from '../lib/constants'
 import toast from 'react-hot-toast'
 
@@ -16,6 +17,7 @@ function formatMonth(ym) {
 
 export default function SettlementPage() {
   const { fetchMonthRecords, fetchPrices } = useLaundry()
+  const { isLaundryOwner } = useAuth()
   const [month, setMonth]       = useState(getCurrentYearMonth())
   const [laundryName, setLaundryName] = useState(() => localStorage.getItem('laundryName') || '')
   const [records, setRecords]   = useState([])
@@ -123,7 +125,9 @@ export default function SettlementPage() {
         <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-4 flex items-start gap-3">
           <span className="text-red-500 text-lg mt-0.5">⚠️</span>
           <div>
-            <div className="text-sm font-semibold text-red-700">الأسعار غير محددة لهذا الفرع</div>
+            <div className="text-sm font-semibold text-red-700">
+              {isLaundryOwner ? 'الأسعار غير محددة لهذا العميل' : 'الأسعار غير محددة لهذا الفرع'}
+            </div>
             <div className="text-xs text-red-600 mt-0.5">اذهب إلى <strong>صفحة الأسعار</strong> وأدخل الأسعار واضغط <strong>حفظ الأسعار</strong>، ثم ارجع هنا.</div>
           </div>
         </div>

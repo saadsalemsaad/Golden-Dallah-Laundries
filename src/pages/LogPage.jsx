@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLaundry } from '../hooks/useLaundry'
+import { useAuth } from '../context/AuthContext'
 import { ARABIC_MONTHS } from '../lib/constants'
 import { exportDayExcel } from '../lib/exportExcel'
+import { printDailyInvoice } from '../lib/dailyInvoice'
 import toast from 'react-hot-toast'
 
 function ExportIcon() {
@@ -26,6 +28,7 @@ function formatMonth(ym) {
 
 export default function LogPage() {
   const { fetchMonthRecords, fetchPrices, deleteRecord } = useLaundry()
+  const { organization, activeBranch, isLaundryOwner } = useAuth()
   const navigate = useNavigate()
   const [month, setMonth]       = useState(getCurrentYearMonth())
   const [records, setRecords]   = useState([])
@@ -63,14 +66,30 @@ export default function LogPage() {
   const calcAmount = (rec) => {
     if (!rec.record_items?.length) return rec.total_amount || 0
     const computed = rec.record_items.reduce((sum, ri) => {
-      const price = priceMap[ri.item_id] || ri.price || 0
+      const price = isLaundryOwner ? (ri.price || 0) : (priceMap[ri.item_id] || ri.price || 0)
       return sum + (ri.washed || 0) * price
     }, 0)
     return computed > 0 ? computed : (rec.total_amount || 0)
   }
 
   const handleExportDay = (rec) => {
-    exportDayExcel({ record: rec, priceMap, laundryName: localStorage.getItem('laundryName') || '' })
+    exportDayExcel({
+      record: rec,
+      priceMap: isLaundryOwner ? {} : priceMap,
+      laundryName: localStorage.getItem('laundryName') || '',
+    })
+  }
+
+  const handleInvoice = (rec) => {
+    try {
+      printDailyInvoice({
+        record: rec,
+        organizationName: organization?.name,
+        customerName: rec.client || activeBranch?.name,
+      })
+    } catch (error) {
+      toast.error(error.message)
+    }
   }
 
   const totalAmount = records.reduce((a, r) => a + calcAmount(r), 0)
@@ -151,6 +170,12 @@ export default function LogPage() {
                       className="flex-1 rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-xs font-medium text-green-700 flex items-center justify-center gap-1">
                       <ExportIcon /> Excel
                     </button>
+                    {isLaundryOwner && (
+                      <button onClick={() => handleInvoice(rec)}
+                        className="flex-1 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+                        فاتورة
+                      </button>
+                    )}
                     <button onClick={() => handleDelete(rec.id)}
                       className="flex-1 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
                       حذف
@@ -216,6 +241,10 @@ export default function LogPage() {
                             className="text-xs text-green-600 hover:text-green-800 font-medium flex items-center gap-0.5">
                             <ExportIcon /> Excel
                           </button>
+                          {isLaundryOwner && (
+                            <button onClick={() => handleInvoice(rec)}
+                              className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">فاتورة</button>
+                          )}
                           <button onClick={() => handleDelete(rec.id)}
                             className="text-xs text-red-500 hover:text-red-700 font-medium">حذف</button>
                         </div>
