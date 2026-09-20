@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext({})
@@ -15,25 +15,41 @@ export function AuthProvider({ children }) {
   const [branches, setBranches] = useState([])
   const [activeBranch, setActiveBranch] = useState(null)
   const [isLaundryOwner, setIsLaundryOwner] = useState(false)
+  const lastResolvedSessionRef = useRef(null)
 
-  const fetchLaundryOwnerData = async (userId) => {
+  const clearLaundryOwnerData = useCallback(() => {
+    setOrganization(null)
+    setOrganizationType(null)
+    setMembership(null)
+    setBranches([])
+    setActiveBranch(null)
+    setIsLaundryOwner(false)
+  }, [])
+
+  const fetchLaundryOwnerData = useCallback(async (userId) => {
     try {
-      // Fetch membership
-      const { data: membershipData, error: membershipError } = await supabase
+      const { data: membershipsData, error: membershipError } = await supabase
         .from('memberships')
         .select('*, organizations(*)')
         .eq('user_id', userId)
         .eq('role', 'organization_admin')
         .eq('status', 'active')
         .is('branch_id', null)
-        .single()
+        .limit(2)
 
       if (membershipError) {
-        if (membershipError.code !== 'PGRST116') {
-          console.error('Error fetching membership:', membershipError)
-        }
+        console.error('Error fetching membership:', membershipError)
         return
       }
+
+      if (!membershipsData?.length) return
+
+      if (membershipsData.length > 1) {
+        console.error('Multiple active organization admin memberships found for user:', userId)
+        return
+      }
+
+      const membershipData = membershipsData[0]
 
       if (membershipData && membershipData.organizations?.type === 'laundry') {
         setMembership(membershipData)
@@ -57,39 +73,58 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('Error fetching laundry owner data:', error)
     }
-  }
+  }, [])
+
+  const resolveSession = useCallback(async (session) => {
+    const currentUser = session?.user ?? null
+    const branchName = currentUser?.user_metadata?.branch ?? null
+
+    setUser(currentUser)
+    setBranch(branchName)
+    clearLaundryOwnerData()
+
+    if (!currentUser) return
+
+    // Branch accounts are legacy branch users. They should not run the
+    // organization_admin probe because the missing owner membership is expected.
+    if (branchName) return
+
+    await fetchLaundryOwnerData(currentUser.id)
+  }, [clearLaundryOwnerData, fetchLaundryOwnerData])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setBranch(session?.user?.user_metadata?.branch ?? null)
-      
-      if (session?.user) {
-        fetchLaundryOwnerData(session.user.id)
-      }
-      
+    let isMounted = true
+    const getSessionKey = (session) => {
+      const currentUser = session?.user
+      if (!currentUser) return 'signed-out'
+      return `${currentUser.id}:${currentUser.user_metadata?.branch || 'owner'}`
+    }
+
+    const handleSession = async (session) => {
+      const sessionKey = getSessionKey(session)
+      if (lastResolvedSessionRef.current === sessionKey) return
+
+      lastResolvedSessionRef.current = sessionKey
+      await resolveSession(session)
+    }
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return
+      await handleSession(session)
+      if (!isMounted) return
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      setBranch(session?.user?.user_metadata?.branch ?? null)
-      
-      if (session?.user) {
-        fetchLaundryOwnerData(session.user.id)
-      } else {
-        // Clear laundry owner data on sign out
-        setOrganization(null)
-        setOrganizationType(null)
-        setMembership(null)
-        setBranches([])
-        setActiveBranch(null)
-        setIsLaundryOwner(false)
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await handleSession(session)
+      if (isMounted) setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [resolveSession])
 
   const signIn = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
