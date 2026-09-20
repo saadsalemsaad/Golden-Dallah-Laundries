@@ -4,6 +4,7 @@ export const ITEMS = [
   { id: 'sheet_b',    sec: 1, ar: 'مفرش سرير كبير',     en: 'Bed sheet (B)' },
   { id: 'sheet_s',    sec: 1, ar: 'مفرش سرير صغير',     en: 'Bed sheet (S)' },
   { id: 'pillow_c',   sec: 1, ar: 'غطاء مخدة',          en: 'Pillow case' },
+  { id: 'pillow_c_colored', sec: 1, ar: 'كيس مخدة ملون', en: 'Colored pillow case' },
   // اضافة عنصر جديد في السيستم 
   {id : 'Colored bedsheet' , sec: 1, ar: 'مفرش سرير ملون', en : 'Colored bedsheet'},
   { id: 'bed_runner', sec: 1, ar: 'رانر سرير',           en: 'Bed runner' },
