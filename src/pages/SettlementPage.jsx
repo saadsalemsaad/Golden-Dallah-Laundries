@@ -85,6 +85,12 @@ export default function SettlementPage() {
 
   const handlePrint = () => {
     const displayName = laundryName || invoiceName || 'المغسلة'
+    const developerFooter = isLaundryOwner
+      ? `<div class="developer-footer">
+          <div>تم تطوير النظام بواسطة سعد سالم</div>
+          <div>للدعم والتواصل: 0507911674</div>
+        </div>`
+      : ''
     const rows = Object.values(agg).filter(i => i.totalWashed > 0)
       .map(i => `<tr><td>${i.ar}</td><td>${i.en}</td><td style="text-align:center">${i.totalWashed}</td><td style="text-align:center">${i.price.toFixed(2)}</td><td style="text-align:center">${(i.totalWashed * i.price).toFixed(2)}</td></tr>`)
       .join('')
@@ -101,10 +107,7 @@ export default function SettlementPage() {
     <tbody>${rows}</tbody></table>
     <div class="total">الإجمالي المستحق: ${grandTotal.toFixed(2)} ريال سعودي</div>
     <div class="sigs"><span>توقيع الفندق: _______________</span><span>توقيع المغسلة: _______________</span></div>
-    <div class="developer-footer">
-      <div>تم تطوير النظام بواسطة سعد سالم</div>
-      <div>للدعم والتواصل: 0507911674</div>
-    </div>
+    ${developerFooter}
     </body></html>`)
     win.document.close()
     win.print()
@@ -271,10 +274,12 @@ export default function SettlementPage() {
               🖨️ طباعة التسوية
             </button>
           </div>
-          <div className="mt-5 pt-4 border-t border-slate-100 text-center text-[10px] leading-5 text-slate-400">
-            <div>تم تطوير النظام بواسطة سعد سالم</div>
-            <div>الدعم: 0507911674</div>
-          </div>
+          {isLaundryOwner && (
+            <div className="mt-5 pt-4 border-t border-slate-100 text-center text-[10px] leading-5 text-slate-400">
+              <div>تم تطوير النظام بواسطة سعد سالم</div>
+              <div>الدعم: 0507911674</div>
+            </div>
+          )}
         </>
       )}
     </div>
