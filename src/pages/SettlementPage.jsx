@@ -17,7 +17,7 @@ function formatMonth(ym) {
 
 export default function SettlementPage() {
   const { fetchMonthRecords, fetchPrices } = useLaundry()
-  const { isLaundryOwner } = useAuth()
+  const { isLaundryOwner, activeBranch, branch } = useAuth()
   const [month, setMonth]       = useState(getCurrentYearMonth())
   const [laundryName, setLaundryName] = useState(() => localStorage.getItem('laundryName') || '')
   const [records, setRecords]   = useState([])
@@ -41,6 +41,14 @@ export default function SettlementPage() {
   }, [fetchMonthRecords, fetchPrices])
 
   useEffect(() => { load(month) }, [month, load])
+
+  const invoiceName = records.find(rec => rec.client)?.client || activeBranch?.name || branch || ''
+
+  useEffect(() => {
+    if (!laundryName && invoiceName) {
+      setLaundryName(invoiceName)
+    }
+  }, [invoiceName, laundryName])
 
   // Aggregate washed quantities
   // Price priority: prices table (current) → last seen ri.price in records (fallback)
@@ -76,6 +84,7 @@ export default function SettlementPage() {
   }
 
   const handlePrint = () => {
+    const displayName = laundryName || invoiceName || 'المغسلة'
     const rows = Object.values(agg).filter(i => i.totalWashed > 0)
       .map(i => `<tr><td>${i.ar}</td><td>${i.en}</td><td style="text-align:center">${i.totalWashed}</td><td style="text-align:center">${i.price.toFixed(2)}</td><td style="text-align:center">${(i.totalWashed * i.price).toFixed(2)}</td></tr>`)
       .join('')
@@ -84,13 +93,18 @@ export default function SettlementPage() {
     <style>body{font-family:Arial;direction:rtl;padding:24px;font-size:13px}h2{text-align:center}
     table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ccc;padding:7px 10px}
     th{background:#f5f5f5;text-align:center}.total{font-size:16px;font-weight:bold;text-align:center;padding:14px;border-top:2px solid #333;margin-top:10px}
-    .sigs{display:flex;justify-content:space-between;margin-top:48px;font-size:12px;color:#555}</style></head><body>
+    .sigs{display:flex;justify-content:space-between;margin-top:48px;font-size:12px;color:#555}
+    .developer-footer{margin-top:28px;padding-top:10px;border-top:1px solid #ddd;text-align:center;color:#777;font-size:10px;line-height:1.7}</style></head><body>
     <h2>تسوية شهرية — ${formatMonth(month)}</h2>
-    <p style="text-align:center;color:#666;font-size:12px">مع: ${laundryName || 'المغسلة'} | ${records.length} يوم عمل</p>
+    <p style="text-align:center;color:#666;font-size:12px">مع: ${displayName} | ${records.length} يوم عمل</p>
     <table><thead><tr><th>الصنف</th><th>Item</th><th>عدد القطع</th><th>سعر القطعة (ر.س)</th><th>الإجمالي (ر.س)</th></tr></thead>
     <tbody>${rows}</tbody></table>
     <div class="total">الإجمالي المستحق: ${grandTotal.toFixed(2)} ريال سعودي</div>
     <div class="sigs"><span>توقيع الفندق: _______________</span><span>توقيع المغسلة: _______________</span></div>
+    <div class="developer-footer">
+      <div>تم تطوير النظام بواسطة سعد سالم</div>
+      <div>للدعم والتواصل: 0507911674</div>
+    </div>
     </body></html>`)
     win.document.close()
     win.print()
@@ -113,9 +127,9 @@ export default function SettlementPage() {
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">اسم المغسلة</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">اسم العميل / المغسلة</label>
             <input type="text" value={laundryName} onChange={handleLaundryNameChange}
-              placeholder="اسم المغسلة للطباعة"
+              placeholder={invoiceName || 'اسم العميل للطباعة'}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
         </div>
@@ -256,6 +270,10 @@ export default function SettlementPage() {
               className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors text-center">
               🖨️ طباعة التسوية
             </button>
+          </div>
+          <div className="mt-5 pt-4 border-t border-slate-100 text-center text-[10px] leading-5 text-slate-400">
+            <div>تم تطوير النظام بواسطة سعد سالم</div>
+            <div>الدعم: 0507911674</div>
           </div>
         </>
       )}

@@ -6,7 +6,24 @@ import { useAuth } from '../context/AuthContext'
 import { printDailyInvoice } from '../lib/dailyInvoice'
 import toast from 'react-hot-toast'
 
-const today = () => new Date().toISOString().split('T')[0]
+function formatDateInput(dateValue) {
+  return [
+    dateValue.getFullYear(),
+    String(dateValue.getMonth() + 1).padStart(2, '0'),
+    String(dateValue.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+const today = () => formatDateInput(new Date())
+
+const ARABIC_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+
+function dayNameFromDate(value) {
+  if (!value) return ''
+  const dateValue = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(dateValue.getTime())) return ''
+  return ARABIC_DAYS[dateValue.getDay()]
+}
 
 function initRows(prices = {}, carry = {}, carryTreatment = {}) {
   return ITEMS.map(item => ({
@@ -34,6 +51,11 @@ function calcRow(row) {
   return { ...row, total_received, remaining_at_laundry, remaining, amount }
 }
 
+function hasRowActivity(row) {
+  return ['carry', 'carry_treatment', 'new_qty', 'washed', 'for_treatment', 'total_received', 'remaining_at_laundry', 'remaining']
+    .some(field => Number(row[field] || 0) > 0)
+}
+
 export default function EntryPage() {
   const { fetchRecord, fetchPrevRecord, fetchPrices, saveRecord, loading } = useLaundry()
   const { organization, activeBranch, isLaundryOwner } = useAuth()
@@ -46,6 +68,7 @@ export default function EntryPage() {
   const [isSaved, setIsSaved] = useState(false)
   const [carryDate, setCarryDate] = useState(null)
   const [savedRecord, setSavedRecord] = useState(null)
+  const [itemFilter, setItemFilter] = useState('all')
 
   const loadDate = useCallback(async (d) => {
     const [existing, prev, prices] = await Promise.all([
@@ -72,7 +95,7 @@ export default function EntryPage() {
     }
 
     if (existing?.record_items) {
-      setDay(existing.day || '')
+      setDay(dayNameFromDate(d))
       setClient(existing.client || '')
       setIsSaved(true)
       setSavedRecord(existing)
@@ -108,6 +131,10 @@ export default function EntryPage() {
     if (date) loadDate(date)
   }, [date, loadDate, location.pathname])
 
+  useEffect(() => {
+    setDay(dayNameFromDate(date))
+  }, [date])
+
   const updateRow = (idx, field, value) => {
     setRows(prev => {
       const next = [...prev]
@@ -118,14 +145,16 @@ export default function EntryPage() {
 
   const handleSave = async () => {
     if (!date) { toast.error('اختر التاريخ أولاً'); return }
-    const record = await saveRecord({ date, day, client, items: rows })
+    const computedDay = dayNameFromDate(date)
+    const record = await saveRecord({ date, day: computedDay, client, items: rows })
     setSavedRecord({
       ...record,
       date,
-      day,
+      day: computedDay,
       client,
       record_items: rows.map(row => ({ ...row })),
     })
+    setDay(computedDay)
     setIsSaved(true)
   }
 
@@ -144,8 +173,9 @@ export default function EntryPage() {
   const handleNewDay = () => {
     const next = new Date(date)
     next.setDate(next.getDate() + 1)
-    setDate(next.toISOString().split('T')[0])
-    setDay('')
+    const nextDate = formatDateInput(next)
+    setDate(nextDate)
+    setDay(dayNameFromDate(nextDate))
     setClient('')
     setIsSaved(false)
     setSavedRecord(null)
@@ -162,6 +192,14 @@ export default function EntryPage() {
     }),
     { received: 0, washed: 0, for_treatment: 0, remaining_at_laundry: 0, remaining: 0, amount: 0 }
   )
+
+  const rowMatchesFilter = (row) => {
+    if (itemFilter === 'all') return true
+    if (itemFilter === 'active') return hasRowActivity(row)
+    return row.item_id === itemFilter
+  }
+
+  const visibleRowsCount = rows.filter(rowMatchesFilter).length
 
   return (
     <div>
@@ -187,8 +225,8 @@ export default function EntryPage() {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">اليوم</label>
-            <input type="text" value={day} onChange={e => setDay(e.target.value)} placeholder="مثال: الأحد"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input type="text" value={day} readOnly placeholder="يتحدد تلقائياً من التاريخ"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-600 focus:outline-none" />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">اسم العميل</label>
@@ -218,9 +256,29 @@ export default function EntryPage() {
         </div>
       )}
 
+      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 sm:items-end">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">عرض الأصناف</label>
+            <select value={itemFilter} onChange={e => setItemFilter(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="all">كل الأصناف</option>
+              <option value="active">الأصناف التي عليها حركة فقط</option>
+              {ITEMS.map(item => (
+                <option key={item.id} value={item.id}>{item.ar} - {item.en}</option>
+              ))}
+            </select>
+          </div>
+          <div className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-center">
+            المعروض: {visibleRowsCount} من {rows.length}
+          </div>
+        </div>
+      </div>
+
       {/* Tables per section */}
       {SECTIONS.map(sec => {
-        const secRows = rows.map((r, idx) => ({ ...r, idx })).filter(r => r.sec === sec.id)
+        const secRows = rows.map((r, idx) => ({ ...r, idx })).filter(r => r.sec === sec.id && rowMatchesFilter(r))
+        if (!secRows.length) return null
         return (
           <div key={sec.id} className="bg-white rounded-xl border border-slate-200 mb-4 overflow-hidden">
             <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-100">
