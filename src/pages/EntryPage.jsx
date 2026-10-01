@@ -4,6 +4,7 @@ import { ITEMS, SECTIONS } from '../lib/constants'
 import { useLaundry } from '../hooks/useLaundry'
 import { useAuth } from '../context/AuthContext'
 import { printDailyInvoice } from '../lib/dailyInvoice'
+import { calculateItemTotals } from '../lib/recordMath'
 import toast from 'react-hot-toast'
 
 function formatDateInput(dateValue) {
@@ -41,14 +42,7 @@ function initRows(prices = {}, carry = {}, carryTreatment = {}) {
 }
 
 function calcRow(row) {
-  // total = ترحيل عادي + ترحيل معالجة + جديد اليوم
-  const total_received        = row.carry + (row.carry_treatment || 0) + row.new_qty
-  // متبقية عند المغسلة = الإجمالي - مغسولة - للمعالجة
-  const remaining_at_laundry  = total_received - row.washed - row.for_treatment
-  // المتبقي الكلي = عند المغسلة + للمعالجة
-  const remaining              = remaining_at_laundry + row.for_treatment
-  const amount                 = row.washed * row.price
-  return { ...row, total_received, remaining_at_laundry, remaining, amount }
+  return calculateItemTotals(row)
 }
 
 function hasRowActivity(row) {
@@ -295,9 +289,12 @@ export default function EntryPage() {
                       <div className="text-slate-400 text-xs mt-0.5">{row.en}</div>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      {row.carry > 0 && (
-                        <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">🔵 {row.carry}</span>
-                      )}
+                      <label className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                        <span>ترحيل 🔵</span>
+                        <input type="number" min="0" inputMode="numeric" value={row.carry || ''}
+                          onChange={e => updateRow(row.idx, 'carry', e.target.value)}
+                          className="w-10 bg-transparent text-center font-medium focus:outline-none" />
+                      </label>
                       {row.carry_treatment > 0 && (
                         <span className="bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-0.5 rounded-full">🟡 {row.carry_treatment}</span>
                       )}
@@ -388,9 +385,10 @@ export default function EntryPage() {
                       </td>
                       {/* ترحيل عادي */}
                       <td className="text-center px-2 py-2">
-                        {row.carry > 0
-                          ? <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">{row.carry}</span>
-                          : <span className="text-slate-300 text-xs">—</span>}
+                        <input type="number" min="0" inputMode="numeric" value={row.carry || ''}
+                          onChange={e => updateRow(row.idx, 'carry', e.target.value)}
+                          aria-label={`ترحيل ${row.ar}`}
+                          className="w-14 text-center border border-slate-200 rounded-md py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                       </td>
                       {/* ترحيل معالجة */}
                       <td className="text-center px-2 py-2">
