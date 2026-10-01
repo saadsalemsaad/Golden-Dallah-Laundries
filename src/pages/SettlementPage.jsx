@@ -4,9 +4,15 @@ import { useAuth } from '../context/AuthContext'
 import { ITEMS, SECTIONS, ARABIC_MONTHS } from '../lib/constants'
 import toast from 'react-hot-toast'
 
+const TAX_RATE = 0.15
+
 function getCurrentYearMonth() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
 }
 
 function formatMonth(ym) {
@@ -20,6 +26,7 @@ export default function SettlementPage() {
   const { isLaundryOwner, activeBranch, branch } = useAuth()
   const [month, setMonth]       = useState(getCurrentYearMonth())
   const [laundryName, setLaundryName] = useState(() => localStorage.getItem('laundryName') || '')
+  const [includeTax, setIncludeTax] = useState(() => localStorage.getItem('settlementIncludesTax') !== 'false')
   const [records, setRecords]   = useState([])
   const [priceMap, setPriceMap] = useState({})
   const [loading, setLoading]   = useState(false)
@@ -68,7 +75,9 @@ export default function SettlementPage() {
     if (agg[item_id] && price > 0) agg[item_id].price = price
   })
 
-  const grandTotal = Object.values(agg).reduce((a, i) => a + i.totalWashed * i.price, 0)
+  const subtotal = roundMoney(Object.values(agg).reduce((a, i) => a + i.totalWashed * i.price, 0))
+  const calculatedTax = roundMoney(subtotal * TAX_RATE)
+  const payableTotal = includeTax ? roundMoney(subtotal + calculatedTax) : subtotal
   const totalPieces = Object.values(agg).reduce((a, i) => a + i.totalWashed, 0)
   const totalForTreatment = Object.values(agg).reduce((a, i) => a + i.totalForTreatment, 0)
 
@@ -83,8 +92,15 @@ export default function SettlementPage() {
     localStorage.setItem('laundryName', e.target.value)
   }
 
+  const handleIncludeTaxChange = (e) => {
+    setIncludeTax(e.target.checked)
+    localStorage.setItem('settlementIncludesTax', String(e.target.checked))
+  }
+
   const handlePrint = () => {
     const displayName = laundryName || invoiceName || 'المغسلة'
+    const taxLabel = includeTax ? 'ضريبة القيمة المضافة (15%)' : 'ضريبة القيمة المضافة (توضيحية فقط)'
+    const totalLabel = includeTax ? 'الإجمالي شامل الضريبة / المستحق' : 'الإجمالي المستحق بدون ضريبة'
     const developerFooter = isLaundryOwner
       ? `<div class="developer-footer">
           <div>تم تطوير النظام بواسطة سعد سالم</div>
@@ -98,14 +114,18 @@ export default function SettlementPage() {
     win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>تسوية ${formatMonth(month)}</title>
     <style>body{font-family:Arial;direction:rtl;padding:24px;font-size:13px}h2{text-align:center}
     table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ccc;padding:7px 10px}
-    th{background:#f5f5f5;text-align:center}.total{font-size:16px;font-weight:bold;text-align:center;padding:14px;border-top:2px solid #333;margin-top:10px}
+    th{background:#f5f5f5;text-align:center}.summary{width:340px;margin:18px 0 0 auto;border:1px solid #ddd}.summary-row{display:flex;justify-content:space-between;padding:9px 12px;border-bottom:1px solid #eee}.summary-row:last-child{border-bottom:0}.summary-row.total{font-size:16px;font-weight:bold;background:#eff6ff;color:#1d4ed8}
     .sigs{display:flex;justify-content:space-between;margin-top:48px;font-size:12px;color:#555}
     .developer-footer{margin-top:28px;padding-top:10px;border-top:1px solid #ddd;text-align:center;color:#777;font-size:10px;line-height:1.7}</style></head><body>
     <h2>تسوية شهرية — ${formatMonth(month)}</h2>
     <p style="text-align:center;color:#666;font-size:12px">مع: ${displayName} | ${records.length} يوم عمل</p>
-    <table><thead><tr><th>الصنف</th><th>Item</th><th>عدد القطع</th><th>سعر القطعة (ر.س)</th><th>الإجمالي (ر.س)</th></tr></thead>
+    <table><thead><tr><th>الصنف</th><th>Item</th><th>عدد القطع</th><th>سعر القطعة (ر.س)</th><th>الإجمالي قبل الضريبة (ر.س)</th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <div class="total">الإجمالي المستحق: ${grandTotal.toFixed(2)} ريال سعودي</div>
+    <div class="summary">
+      <div class="summary-row"><span>الإجمالي بدون الضريبة</span><strong>${subtotal.toFixed(2)} ر.س</strong></div>
+      <div class="summary-row"><span>${taxLabel}</span><strong>${calculatedTax.toFixed(2)} ر.س</strong></div>
+      <div class="summary-row total"><span>${totalLabel}</span><strong>${payableTotal.toFixed(2)} ر.س</strong></div>
+    </div>
     <div class="sigs"><span>توقيع الفندق: _______________</span><span>توقيع المغسلة: _______________</span></div>
     ${developerFooter}
     </body></html>`)
@@ -123,7 +143,7 @@ export default function SettlementPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">الشهر</label>
             <input type="month" value={month} onChange={e => setMonth(e.target.value)}
@@ -134,6 +154,17 @@ export default function SettlementPage() {
             <input type="text" value={laundryName} onChange={handleLaundryNameChange}
               placeholder={invoiceName || 'اسم العميل للطباعة'}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div className="flex items-end">
+            <label className="flex w-full items-center justify-between gap-3 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+              <span className="font-medium text-slate-700">تطبيق الضريبة على التسوية</span>
+              <input
+                type="checkbox"
+                checked={includeTax}
+                onChange={handleIncludeTaxChange}
+                className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+            </label>
           </div>
         </div>
       </div>
@@ -172,13 +203,15 @@ export default function SettlementPage() {
           )}
 
           {/* Summary cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 md:gap-4 mb-5">
             {[
               { label: 'أيام عمل',         value: records.length },
               { label: 'إجمالي القطع المغسولة', value: totalPieces },
               { label: 'للمعالجة (غير محسوبة)', value: totalForTreatment, color: 'text-yellow-600' },
               { label: 'متبقي آخر الشهر',  value: endRemaining, color: endRemaining > 0 ? 'text-amber-600' : 'text-green-600' },
-              { label: 'إجمالي التسوية',    value: `${grandTotal.toFixed(2)} ر.س`, color: 'text-blue-700' },
+              { label: 'بدون الضريبة',    value: `${subtotal.toFixed(2)} ر.س`, color: 'text-slate-700' },
+              { label: includeTax ? 'ضريبة 15%' : 'ضريبة توضيحية',    value: `${calculatedTax.toFixed(2)} ر.س`, color: 'text-cyan-700' },
+              { label: includeTax ? 'شامل الضريبة' : 'المستحق بدون ضريبة',    value: `${payableTotal.toFixed(2)} ر.س`, color: 'text-blue-700' },
             ].map(c => (
               <div key={c.label} className="bg-white rounded-xl border border-slate-200 p-4 text-center">
                 <div className={`text-xl font-bold ${c.color || 'text-slate-800'}`}>{c.value}</div>
@@ -214,7 +247,7 @@ export default function SettlementPage() {
                           <div className="text-sm font-medium text-slate-700">{item.price.toFixed(2)}</div>
                         </div>
                         <div className="rounded-lg bg-slate-50 p-2">
-                          <div className="text-[11px] text-slate-400">الإجمالي</div>
+                          <div className="text-[11px] text-slate-400">قبل الضريبة</div>
                           <div className="text-sm font-medium text-slate-800">{(item.totalWashed * item.price).toFixed(2)}</div>
                         </div>
                       </div>
@@ -231,7 +264,7 @@ export default function SettlementPage() {
                       <th className="text-right px-4 py-2.5 font-medium text-slate-500 text-xs w-48">الصنف</th>
                       <th className="text-center px-4 py-2.5 font-medium text-slate-500 text-xs">القطع المغسولة</th>
                       <th className="text-center px-4 py-2.5 font-medium text-slate-500 text-xs">سعر القطعة</th>
-                      <th className="text-center px-4 py-2.5 font-medium text-slate-500 text-xs">الإجمالي</th>
+                      <th className="text-center px-4 py-2.5 font-medium text-slate-500 text-xs">الإجمالي قبل الضريبة</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -261,8 +294,20 @@ export default function SettlementPage() {
 
           {/* Grand total */}
           <div className="bg-white rounded-xl border border-slate-200 p-5 text-center mb-4">
-            <div className="text-sm text-slate-500 mb-1">الإجمالي المستحق</div>
-            <div className="text-3xl font-bold text-blue-700">{grandTotal.toFixed(2)} ريال سعودي</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+              <div>
+                <div className="text-xs text-slate-500 mb-1">الإجمالي بدون الضريبة</div>
+                <div className="text-xl font-bold text-slate-700">{subtotal.toFixed(2)} ر.س</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 mb-1">{includeTax ? 'ضريبة القيمة المضافة (15%)' : 'ضريبة القيمة المضافة (توضيحية فقط)'}</div>
+                <div className="text-xl font-bold text-cyan-700">{calculatedTax.toFixed(2)} ر.س</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 mb-1">{includeTax ? 'الإجمالي شامل الضريبة / المستحق' : 'الإجمالي المستحق بدون ضريبة'}</div>
+                <div className="text-3xl font-bold text-blue-700">{payableTotal.toFixed(2)} ر.س</div>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center">
