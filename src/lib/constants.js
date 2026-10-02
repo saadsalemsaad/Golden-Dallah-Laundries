@@ -7,6 +7,7 @@ export const ITEMS = [
   { id: 'pillow_c_colored', sec: 1, ar: 'كيس مخدة ملون', en: 'Colored pillow case' },
   { id: 'colored_bedsheet', sec: 1, ar: 'مفرش سرير ملون', en: 'Colored bedsheet' },
   { id: 'bath_t',     sec: 2, ar: 'منشفة',               en: 'Bath towel' },
+  { id: 'face_t',     sec: 2, ar: 'منشفة وجه',           en: 'Face towel' },
   { id: 'blanket',    sec: 2, ar: 'بطانية',              en: 'Blanket' },
   { id: 'napkin',     sec: 2, ar: 'منديل قماش',          en: 'Napkin' },
   { id: 'carpet',     sec: 2, ar: 'سجاد',                en: 'Carpet' },
