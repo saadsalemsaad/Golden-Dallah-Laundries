@@ -6,11 +6,12 @@ export function calculateItemTotals(row) {
   const price = Number(row.price || 0)
 
   const total_received = carry + newQty
+  const processing_excess = Math.max(0, washed + forTreatment - total_received)
   const remaining_at_laundry = Math.max(0, total_received - washed - forTreatment)
   const remaining = remaining_at_laundry + forTreatment
   const amount = washed * price
 
-  return { ...row, total_received, remaining_at_laundry, remaining, amount }
+  return { ...row, total_received, processing_excess, remaining_at_laundry, remaining, amount }
 }
 
 export function calculateRecordTotals(record) {

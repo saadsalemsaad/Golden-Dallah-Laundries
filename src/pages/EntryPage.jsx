@@ -139,6 +139,11 @@ export default function EntryPage() {
 
   const handleSave = async () => {
     if (!date) { toast.error('اختر التاريخ أولاً'); return }
+    const invalidRow = rows.find(row => row.processing_excess > 0)
+    if (invalidRow) {
+      toast.error(`${invalidRow.ar}: المغسول والمعالج أكثر من المستلم بـ ${invalidRow.processing_excess} قطعة`)
+      return
+    }
     const computedDay = dayNameFromDate(date)
     const record = await saveRecord({ date, day: computedDay, client, items: rows })
     setSavedRecord({
@@ -325,6 +330,12 @@ export default function EntryPage() {
                     </label>
                   </div>
 
+                  {row.processing_excess > 0 && (
+                    <p role="alert" className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                      المغسول والمعالج أكثر من المستلم بـ {row.processing_excess} قطعة
+                    </p>
+                  )}
+
                   {isLaundryOwner && (
                     <label className="block">
                       <span className="block text-xs font-medium text-slate-500 mb-1">سعر الوحدة</span>
@@ -424,12 +435,17 @@ export default function EntryPage() {
                       {/* متبقية عند المغسلة */}
                       <td className="text-center px-2 py-2">
                         {(row.total_received > 0 || row.washed > 0 || row.for_treatment > 0) ? (
-                          <span className={`font-semibold text-sm ${
+                          <div className={`font-semibold text-sm ${
                             row.remaining_at_laundry < 0 ? 'text-red-500' :
                             row.remaining_at_laundry > 0 ? 'text-blue-600' : 'text-green-600'
                           }`}>
                             {row.remaining_at_laundry}
-                          </span>
+                            {row.processing_excess > 0 && (
+                              <div role="alert" className="mt-1 text-xs text-red-600">
+                                زيادة {row.processing_excess}
+                              </div>
+                            )}
+                          </div>
                         ) : <span className="text-slate-300 text-xs">—</span>}
                       </td>
                       {/* السعر */}

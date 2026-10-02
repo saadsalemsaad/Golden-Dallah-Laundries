@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useLaundry } from '../hooks/useLaundry'
 import { useAuth } from '../context/AuthContext'
 import { ITEMS, SECTIONS, ARABIC_MONTHS } from '../lib/constants'
+import { calculateRecordTotals } from '../lib/recordMath'
 import toast from 'react-hot-toast'
 
 const TAX_RATE = 0.15
@@ -19,6 +20,15 @@ function formatMonth(ym) {
   if (!ym) return ''
   const [y, m] = ym.split('-')
   return `${ARABIC_MONTHS[parseInt(m) - 1]} ${y}`
+}
+
+function recordRemainingTotals(record) {
+  const totals = calculateRecordTotals(record)
+  return {
+    atLaundry: totals.atLaundry,
+    forTreatment: totals.forTreatment,
+    total: totals.remaining,
+  }
 }
 
 export default function SettlementPage() {
@@ -83,9 +93,10 @@ export default function SettlementPage() {
 
   // End-of-month remaining
   const lastRec = records[records.length - 1]
-  const endRemaining = lastRec?.total_remaining || 0
-  const endRemainingAtLaundry = lastRec?.record_items?.reduce((a, ri) => a + (ri.remaining_at_laundry || 0), 0) || 0
-  const endForTreatment = lastRec?.record_items?.reduce((a, ri) => a + (ri.for_treatment || 0), 0) || 0
+  const endRemainingTotals = recordRemainingTotals(lastRec)
+  const endRemaining = endRemainingTotals.total
+  const endRemainingAtLaundry = endRemainingTotals.atLaundry
+  const endForTreatment = endRemainingTotals.forTreatment
 
   const handleLaundryNameChange = (e) => {
     setLaundryName(e.target.value)

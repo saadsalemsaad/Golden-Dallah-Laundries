@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { ARABIC_MONTHS } from '../lib/constants'
 import { exportDayExcel } from '../lib/exportExcel'
 import { printDailyInvoice } from '../lib/dailyInvoice'
+import { calculateRecordTotals } from '../lib/recordMath'
 import toast from 'react-hot-toast'
 
 function ExportIcon() {
@@ -24,6 +25,15 @@ function formatMonth(ym) {
   if (!ym) return ''
   const [y, m] = ym.split('-')
   return `${ARABIC_MONTHS[parseInt(m) - 1]} ${y}`
+}
+
+function recordRemainingTotals(record) {
+  const totals = calculateRecordTotals(record)
+  return {
+    atLaundry: totals.atLaundry,
+    forTreatment: totals.forTreatment,
+    total: totals.remaining,
+  }
 }
 
 export default function LogPage() {
@@ -120,6 +130,8 @@ export default function LogPage() {
           <div className="md:hidden space-y-3 mb-4">
             {records.map(rec => {
               const amount = calcAmount(rec)
+              const totals = calculateRecordTotals(rec)
+              const remaining = recordRemainingTotals(rec)
               return (
                 <div key={rec.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -128,19 +140,19 @@ export default function LogPage() {
                       <div className="text-sm text-slate-500 mt-0.5">{rec.client || '—'}</div>
                     </div>
                     <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${
-                      rec.total_remaining <= 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                      remaining.total <= 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
                     }`}>
-                      {rec.total_remaining <= 0 ? 'مكتمل' : `متبقي ${rec.total_remaining}`}
+                      {remaining.total <= 0 ? 'مكتمل' : `متبقي ${remaining.total}`}
                     </span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 mt-3 text-center">
                     <div className="rounded-lg bg-slate-50 p-2">
                       <div className="text-[11px] text-slate-400">المستلم</div>
-                      <div className="text-sm font-medium text-slate-700">{rec.total_received}</div>
+                      <div className="text-sm font-medium text-slate-700">{totals.received}</div>
                     </div>
                     <div className="rounded-lg bg-slate-50 p-2">
                       <div className="text-[11px] text-slate-400">المغسول نظيف</div>
-                      <div className="text-sm font-medium text-slate-700">{rec.total_washed}</div>
+                      <div className="text-sm font-medium text-slate-700">{totals.washed}</div>
                     </div>
                     <div className="rounded-lg bg-blue-50 p-2">
                       <div className="text-[11px] text-slate-400">المبلغ</div>
@@ -151,13 +163,13 @@ export default function LogPage() {
                     <div className="rounded-lg bg-blue-50 p-2">
                       <div className="text-[11px] text-slate-400">متبقي عند المغسلة 🔵</div>
                       <div className="text-sm font-medium text-blue-700">
-                        {rec.record_items?.reduce((a, ri) => a + (ri.remaining_at_laundry || 0), 0) || 0}
+                        {remaining.atLaundry}
                       </div>
                     </div>
                     <div className="rounded-lg bg-yellow-50 p-2">
                       <div className="text-[11px] text-slate-400">للمعالجة 🟡</div>
                       <div className="text-sm font-medium text-yellow-700">
-                        {rec.record_items?.reduce((a, ri) => a + (ri.for_treatment || 0), 0) || 0}
+                        {remaining.forTreatment}
                       </div>
                     </div>
                   </div>
@@ -206,21 +218,23 @@ export default function LogPage() {
               <tbody>
                 {records.map(rec => {
                   const amount = calcAmount(rec)
+                  const totals = calculateRecordTotals(rec)
+                  const remaining = recordRemainingTotals(rec)
                   return (
                     <tr key={rec.id} className="border-b border-slate-50 hover:bg-slate-50/50">
                       <td className="px-4 py-3 text-slate-700 font-medium">{rec.date}</td>
                       <td className="px-4 py-3 text-slate-600">{rec.client || '—'}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{rec.total_received}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{rec.total_washed}</td>
+                      <td className="px-4 py-3 text-center text-slate-600">{totals.received}</td>
+                      <td className="px-4 py-3 text-center text-slate-600">{totals.washed}</td>
                       <td className="px-4 py-3 text-center text-yellow-600 font-medium">
-                        {rec.record_items?.reduce((a, ri) => a + (ri.for_treatment || 0), 0) || 0}
+                        {remaining.forTreatment}
                       </td>
                       <td className="px-4 py-3 text-center text-blue-600 font-medium">
-                        {rec.record_items?.reduce((a, ri) => a + (ri.remaining_at_laundry || 0), 0) || 0}
+                        {remaining.atLaundry}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={rec.total_remaining > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}>
-                          {rec.total_remaining}
+                        <span className={remaining.total > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}>
+                          {remaining.total}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center font-medium text-slate-700">
@@ -228,9 +242,9 @@ export default function LogPage() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                          rec.total_remaining <= 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                          remaining.total <= 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
                         }`}>
-                          {rec.total_remaining <= 0 ? 'مكتمل' : `متبقي ${rec.total_remaining}`}
+                          {remaining.total <= 0 ? 'مكتمل' : `متبقي ${remaining.total}`}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
